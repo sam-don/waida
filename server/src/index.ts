@@ -31,7 +31,9 @@ app.post('/api/tasks', async (req, res) => {
 });
 
 app.use(express.static(path.join(__dirname, "../../client/dist")));
-app.get("*", (_req, res) => {
+// Express 5's path matcher requires a named parameter for wildcard routes.
+// Using `/*path` prevents the `Missing parameter name` error from path-to-regexp.
+app.get("/*path", (_req, res) => {
   res.sendFile(path.join(__dirname, "../../client/dist/index.html"));
 });
 const port = process.env.PORT || 3001;
