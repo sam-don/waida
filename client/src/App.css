@@ -136,6 +136,7 @@
   flex-wrap: wrap;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   transition: all 0.2s ease;
+  list-style-type:none;
 }
 
 .day-tasks li:hover {
@@ -147,10 +148,12 @@
 .task-text {
   cursor: pointer;
   flex-grow: 1;
+  text-align: left;
 }
 
 .task-actions {
   display: flex;
+  flex-direction: column;
   gap: 0.5rem;
 }
 
