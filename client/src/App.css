@@ -1,11 +1,12 @@
 #root {
   max-width: 1280px;
   margin: 0 auto;
-  padding: 2rem;
+  padding: 1rem;
   text-align: center;
   height: 100vh;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .App {
@@ -16,7 +17,8 @@
 
 .App h1 {
   margin-top: 0;
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
+  font-size: 2rem;
 }
 
 .toolbar {
@@ -24,7 +26,7 @@
   justify-content: center;
   align-items: center;
   gap: 1rem;
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
 }
 
 .toolbar input[type="date"] {
@@ -83,11 +85,12 @@
 .three-day-container {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
-  gap: 2rem;
+  gap: 1rem;
   max-width: 1200px;
-  margin: 2rem auto 0;
+  margin: 1rem auto 0;
   flex-grow: 1;
   min-height: 0;
+  overflow: hidden;
 }
 
 .day-column {
@@ -95,6 +98,9 @@
   border-radius: 8px;
   padding: 1rem;
   background-color: rgba(255, 255, 255, 0.05);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
 }
 
 .day-column.focused {
@@ -118,14 +124,23 @@
 }
 
 .day-tasks li {
-  margin-bottom: 0.5rem;
-  padding: 0.5rem;
-  background-color: rgba(255, 255, 255, 0.05);
-  border-radius: 4px;
+  margin-bottom: 0.75rem;
+  padding: 0.75rem;
+  background-color: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
+}
+
+.day-tasks li:hover {
+  background-color: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
 }
 
 .task-text {
@@ -141,6 +156,42 @@
 .task-actions button {
   padding: 0.2rem 0.5rem;
   font-size: 0.8rem;
+}
+
+.new-task {
+  margin-bottom: 1rem;
+  padding: 0.5rem;
+  background-color: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.new-task input {
+  flex-grow: 1;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.87);
+  padding: 0.5rem;
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 0.9rem;
+}
+
+.new-task input:focus {
+  outline: none;
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.new-task input::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.new-task button {
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+  border-radius: 4px;
 }
 
 .details {
