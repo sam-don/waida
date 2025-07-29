@@ -40,3 +40,72 @@
 .read-the-docs {
   color: #888;
 }
+
+.three-day-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 2rem;
+  max-width: 1200px;
+  margin: 2rem auto;
+}
+
+.day-column {
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 1rem;
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.day-column.focused {
+  background-color: rgba(100, 108, 255, 0.1);
+  border-color: #646cff;
+  box-shadow: 0 0 10px rgba(100, 108, 255, 0.3);
+}
+
+.day-header {
+  text-align: center;
+  font-weight: bold;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #444;
+}
+
+.day-tasks {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.day-tasks li {
+  margin-bottom: 0.5rem;
+  padding: 0.5rem;
+  background-color: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.task-text {
+  cursor: pointer;
+  flex-grow: 1;
+}
+
+.task-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.task-actions button {
+  padding: 0.2rem 0.5rem;
+  font-size: 0.8rem;
+}
+
+.details {
+  width: 100%;
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  background-color: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
