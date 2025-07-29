@@ -6,8 +6,15 @@ interface Task {
   text: string;
   notes: string;
 }
+
 interface TaskDetail extends Task {
   subtasks: { id: number; text: string }[];
+}
+
+function formatDate(dateString: string) {
+  const date = new Date(dateString);
+  const options: Intl.DateTimeFormatOptions = { weekday: 'long', month: 'long', day: 'numeric' };
+  return new Intl.DateTimeFormat('en-US', options).format(date);
 }
 
 function App() {
@@ -118,7 +125,7 @@ function App() {
       </div>
       <div className="three-day-container">
         <div className="day-column">
-          <div className="day-header">{getPrevDate(date)}</div>
+          <div className="day-header">{formatDate(getPrevDate(date))}</div>
           <ul className="day-tasks">
             {prevTasks.map(t => (
               <li key={t.id}>
@@ -143,7 +150,7 @@ function App() {
         </div>
         
         <div className="day-column focused">
-          <div className="day-header">{date} (Today)</div>
+          <div className="day-header">{formatDate(date)}</div>
           <div className="new-task">
             <input value={text} onChange={e => setText(e.target.value)} placeholder="New task" />
             <button onClick={addTask}>Add</button>
@@ -172,7 +179,7 @@ function App() {
         </div>
         
         <div className="day-column">
-          <div className="day-header">{getNextDate(date)}</div>
+          <div className="day-header">{formatDate(getNextDate(date))}</div>
           <ul className="day-tasks">
             {nextTasks.map(t => (
               <li key={t.id}>
