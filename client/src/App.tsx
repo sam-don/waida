@@ -5,6 +5,11 @@ interface Task {
   id: number;
   text: string;
   notes: string;
+  date: string;
+  created_at: string;
+  updated_at: string;
+  completed: boolean;
+  task_group_id?: string;
 }
 
 interface TaskDetail extends Task {
@@ -115,6 +120,25 @@ function App() {
     }
   };
 
+  const toggleComplete = async (task: Task) => {
+    await fetch(`/api/tasks/${task.id}/complete`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ completed: !task.completed })
+    });
+    fetchAllTasks();
+  };
+
+  const copyToNextDay = async (task: Task) => {
+    const nextDate = getNextDate(date);
+    await fetch(`/api/tasks/${task.id}/copy`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ target_date: nextDate })
+    });
+    fetchAllTasks();
+  };
+
   return (
     <div className="App">
       <h1>What Am I Doing Again?</h1>
@@ -128,11 +152,20 @@ function App() {
           <div className="day-header">{formatDate(getPrevDate(date))}</div>
           <ul className="day-tasks">
             {prevTasks.map(t => (
-              <li key={t.id}>
-                <span onClick={() => selectTask(t.id)} className="task-text">{t.text}</span>
+              <li key={t.id} className={t.completed ? 'completed' : ''}>
+                <div className="task-content">
+                  <input 
+                    type="checkbox" 
+                    checked={t.completed} 
+                    onChange={() => toggleComplete(t)}
+                    className="task-checkbox"
+                  />
+                  <span onClick={() => selectTask(t.id)} className="task-text">{t.text}</span>
+                </div>
                 <div className="task-actions">
                   <button onClick={() => editTask(t)}>Edit</button>
                   <button onClick={() => deleteTask(t.id)}>Delete</button>
+                  <button onClick={() => copyToNextDay(t)}>Copy →</button>
                 </div>
                 {selected === t.id && details && (
                   <div className="details">
@@ -157,11 +190,20 @@ function App() {
           </div>
           <ul className="day-tasks">
             {currentTasks.map(t => (
-              <li key={t.id}>
-                <span onClick={() => selectTask(t.id)} className="task-text">{t.text}</span>
+              <li key={t.id} className={t.completed ? 'completed' : ''}>
+                <div className="task-content">
+                  <input 
+                    type="checkbox" 
+                    checked={t.completed} 
+                    onChange={() => toggleComplete(t)}
+                    className="task-checkbox"
+                  />
+                  <span onClick={() => selectTask(t.id)} className="task-text">{t.text}</span>
+                </div>
                 <div className="task-actions">
                   <button onClick={() => editTask(t)}>Edit</button>
                   <button onClick={() => deleteTask(t.id)}>Delete</button>
+                  <button onClick={() => copyToNextDay(t)}>Copy →</button>
                 </div>
                 {selected === t.id && details && (
                   <div className="details">
@@ -182,11 +224,20 @@ function App() {
           <div className="day-header">{formatDate(getNextDate(date))}</div>
           <ul className="day-tasks">
             {nextTasks.map(t => (
-              <li key={t.id}>
-                <span onClick={() => selectTask(t.id)} className="task-text">{t.text}</span>
+              <li key={t.id} className={t.completed ? 'completed' : ''}>
+                <div className="task-content">
+                  <input 
+                    type="checkbox" 
+                    checked={t.completed} 
+                    onChange={() => toggleComplete(t)}
+                    className="task-checkbox"
+                  />
+                  <span onClick={() => selectTask(t.id)} className="task-text">{t.text}</span>
+                </div>
                 <div className="task-actions">
                   <button onClick={() => editTask(t)}>Edit</button>
                   <button onClick={() => deleteTask(t.id)}>Delete</button>
+                  <button onClick={() => copyToNextDay(t)}>Copy →</button>
                 </div>
                 {selected === t.id && details && (
                   <div className="details">
