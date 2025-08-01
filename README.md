@@ -4,6 +4,13 @@ What Am I Doing Again?
 
 This project is a simple task tracker built with React, TypeScript and an Express backend using SQLite. It can be built into a single Docker image for easy deployment.
 
+## Quick Start
+```bash
+npm install
+npm start
+```
+This will start both the client (http://localhost:5173) and server (port 3001) simultaneously.
+
 ## Development
 
 ### Client
