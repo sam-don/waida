@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  waida:
+    build: .
+    ports:
+      - "3001:3001"
+    volumes:
+      - waida_db:/app
+    restart: unless-stopped
+
+volumes:
+  waida_db:
