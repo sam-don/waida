@@ -5,6 +5,11 @@ interface Task {
   id: number;
   text: string;
   notes: string;
+  date: string;
+  created_at: string;
+  updated_at: string;
+  completed: boolean;
+  task_group_id?: string;
 }
 
 interface TaskDetail extends Task {
@@ -115,6 +120,41 @@ function App() {
     }
   };
 
+  const toggleComplete = async (task: Task) => {
+    await fetch(`/api/tasks/${task.id}/complete`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ completed: !task.completed })
+    });
+    fetchAllTasks();
+  };
+
+  const copyToNextDay = async (task: Task) => {
+    try {
+      const nextDate = getNextDate(date);
+      console.log(`Copying task ${task.id} to ${nextDate}`);
+      const response = await fetch(`/api/tasks/${task.id}/copy`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ target_date: nextDate })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Copy failed:', response.status, errorData);
+        alert(`Failed to copy task: ${errorData.error || 'Unknown error'}`);
+        return;
+      }
+      
+      const newTask = await response.json();
+      console.log('Task copied successfully:', newTask);
+      fetchAllTasks();
+    } catch (error) {
+      console.error('Error copying task:', error);
+      alert('Failed to copy task. Please try again.');
+    }
+  };
+
   return (
     <div className="App">
       <h1>What Am I Doing Again?</h1>
@@ -128,11 +168,20 @@ function App() {
           <div className="day-header">{formatDate(getPrevDate(date))}</div>
           <ul className="day-tasks">
             {prevTasks.map(t => (
-              <li key={t.id}>
-                <span onClick={() => selectTask(t.id)} className="task-text">{t.text}</span>
+              <li key={t.id} className={t.completed ? 'completed' : ''}>
+                <div className="task-content">
+                  <input 
+                    type="checkbox" 
+                    checked={t.completed} 
+                    onChange={() => toggleComplete(t)}
+                    className="task-checkbox"
+                  />
+                  <span onClick={() => selectTask(t.id)} className="task-text">{t.text}</span>
+                </div>
                 <div className="task-actions">
                   <button onClick={() => editTask(t)}>Edit</button>
                   <button onClick={() => deleteTask(t.id)}>Delete</button>
+                  <button onClick={() => copyToNextDay(t)}>Copy →</button>
                 </div>
                 {selected === t.id && details && (
                   <div className="details">
@@ -157,11 +206,20 @@ function App() {
           </div>
           <ul className="day-tasks">
             {currentTasks.map(t => (
-              <li key={t.id}>
-                <span onClick={() => selectTask(t.id)} className="task-text">{t.text}</span>
+              <li key={t.id} className={t.completed ? 'completed' : ''}>
+                <div className="task-content">
+                  <input 
+                    type="checkbox" 
+                    checked={t.completed} 
+                    onChange={() => toggleComplete(t)}
+                    className="task-checkbox"
+                  />
+                  <span onClick={() => selectTask(t.id)} className="task-text">{t.text}</span>
+                </div>
                 <div className="task-actions">
                   <button onClick={() => editTask(t)}>Edit</button>
                   <button onClick={() => deleteTask(t.id)}>Delete</button>
+                  <button onClick={() => copyToNextDay(t)}>Copy →</button>
                 </div>
                 {selected === t.id && details && (
                   <div className="details">
@@ -182,11 +240,20 @@ function App() {
           <div className="day-header">{formatDate(getNextDate(date))}</div>
           <ul className="day-tasks">
             {nextTasks.map(t => (
-              <li key={t.id}>
-                <span onClick={() => selectTask(t.id)} className="task-text">{t.text}</span>
+              <li key={t.id} className={t.completed ? 'completed' : ''}>
+                <div className="task-content">
+                  <input 
+                    type="checkbox" 
+                    checked={t.completed} 
+                    onChange={() => toggleComplete(t)}
+                    className="task-checkbox"
+                  />
+                  <span onClick={() => selectTask(t.id)} className="task-text">{t.text}</span>
+                </div>
                 <div className="task-actions">
                   <button onClick={() => editTask(t)}>Edit</button>
                   <button onClick={() => deleteTask(t.id)}>Delete</button>
+                  <button onClick={() => copyToNextDay(t)}>Copy →</button>
                 </div>
                 {selected === t.id && details && (
                   <div className="details">

@@ -205,3 +205,24 @@
   background-color: rgba(255, 255, 255, 0.1);
   border-radius: 4px;
 }
+
+.task-content {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-grow: 1;
+}
+
+.task-checkbox {
+  margin: 0;
+  cursor: pointer;
+}
+
+.completed .task-text {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+.completed {
+  background-color: rgba(100, 255, 100, 0.1) !important;
+}
