@@ -6,6 +6,11 @@ import { open } from 'sqlite';
 const app = express();
 app.use(express.json());
 
+app.use((req, res, next) => {
+  console.log(`${req.method} ${req.path} - ${new Date().toISOString()}`);
+  next();
+});
+
 let db: Database;
 
 const initializeDatabase = async () => {
@@ -133,8 +138,13 @@ app.post('/api/tasks/:id/subtasks', async (req, res) => {
   res.json({ id: result.lastID, task_id: req.params.id, text });
 });
 
+app.use('/api', (req, res, next) => {
+  next();
+});
+
 app.use(express.static(path.join(__dirname, '../../client/dist')));
-app.get('/*path', (_req, res) => {
+
+app.get(/^(?!\/api).*/, (_req, res) => {
   res.sendFile(path.join(__dirname, '../../client/dist/index.html'));
 });
 
