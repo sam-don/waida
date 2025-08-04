@@ -130,13 +130,29 @@ function App() {
   };
 
   const copyToNextDay = async (task: Task) => {
-    const nextDate = getNextDate(date);
-    await fetch(`/api/tasks/${task.id}/copy`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ target_date: nextDate })
-    });
-    fetchAllTasks();
+    try {
+      const nextDate = getNextDate(date);
+      console.log(`Copying task ${task.id} to ${nextDate}`);
+      const response = await fetch(`/api/tasks/${task.id}/copy`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ target_date: nextDate })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Copy failed:', response.status, errorData);
+        alert(`Failed to copy task: ${errorData.error || 'Unknown error'}`);
+        return;
+      }
+      
+      const newTask = await response.json();
+      console.log('Task copied successfully:', newTask);
+      fetchAllTasks();
+    } catch (error) {
+      console.error('Error copying task:', error);
+      alert('Failed to copy task. Please try again.');
+    }
   };
 
   return (

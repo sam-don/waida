@@ -8,27 +8,34 @@ app.use(express.json());
 
 let db: Database;
 (async () => {
-  const database = await open({
-    filename: './database.db',
-    driver: sqlite3.Database
-  });
-  db = database;
-  await db.exec(`CREATE TABLE IF NOT EXISTS tasks(
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      text TEXT NOT NULL,
-      notes TEXT DEFAULT '',
-      date TEXT NOT NULL,
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-      updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-      completed INTEGER DEFAULT 0,
-      task_group_id TEXT
-    )`);
-  await db.exec(`CREATE TABLE IF NOT EXISTS subtasks(
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      task_id INTEGER NOT NULL,
-      text TEXT NOT NULL,
-      FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE CASCADE
-    )`);
+  try {
+    console.log('Initializing database...');
+    const database = await open({
+      filename: './database.db',
+      driver: sqlite3.Database
+    });
+    db = database;
+    await db.exec(`CREATE TABLE IF NOT EXISTS tasks(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        text TEXT NOT NULL,
+        notes TEXT DEFAULT '',
+        date TEXT NOT NULL,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        completed INTEGER DEFAULT 0,
+        task_group_id TEXT
+      )`);
+    await db.exec(`CREATE TABLE IF NOT EXISTS subtasks(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        task_id INTEGER NOT NULL,
+        text TEXT NOT NULL,
+        FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE CASCADE
+      )`);
+    console.log('Database initialized successfully');
+  } catch (error) {
+    console.error('Database initialization failed:', error);
+    process.exit(1);
+  }
 })();
 
 app.get('/api/tasks', async (req, res) => {
@@ -90,15 +97,31 @@ app.put('/api/tasks/:id/complete', async (req, res) => {
 });
 
 app.post('/api/tasks/:id/copy', async (req, res) => {
-  const { target_date } = req.body;
-  const id = req.params.id;
-  const task = await db.get('SELECT * FROM tasks WHERE id = ?', id);
-  if (!task) return res.status(404).json({ error: 'not found' });
-  
-  const result: any = await db.run('INSERT INTO tasks(text, notes, date, task_group_id) VALUES(?, ?, ?, ?)', 
-    task.text, task.notes, target_date, task.task_group_id);
-  const newTask = await db.get('SELECT * FROM tasks WHERE id = ?', result.lastID);
-  res.json(newTask);
+  try {
+    console.log(`Copy request received for task ID: ${req.params.id}`);
+    const { target_date } = req.body;
+    const id = req.params.id;
+    
+    if (!target_date) {
+      return res.status(400).json({ error: 'target_date is required' });
+    }
+    
+    const task = await db.get('SELECT * FROM tasks WHERE id = ?', id);
+    if (!task) {
+      console.log(`Task not found for ID: ${id}`);
+      return res.status(404).json({ error: 'not found' });
+    }
+    
+    console.log(`Copying task "${task.text}" to date: ${target_date}`);
+    const result: any = await db.run('INSERT INTO tasks(text, notes, date, task_group_id) VALUES(?, ?, ?, ?)', 
+      task.text, task.notes, target_date, task.task_group_id);
+    const newTask = await db.get('SELECT * FROM tasks WHERE id = ?', result.lastID);
+    console.log(`Successfully created copy with ID: ${newTask.id}`);
+    res.json(newTask);
+  } catch (error) {
+    console.error('Error in copy endpoint:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 app.post('/api/tasks/:id/subtasks', async (req, res) => {
