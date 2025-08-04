@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import './App.css';
 
 interface Task {
@@ -44,7 +44,7 @@ function App() {
     return date.toISOString().substring(0, 10);
   };
 
-  const fetchAllTasks = async (d = date) => {
+  const fetchAllTasks = useCallback(async (d = date) => {
     const prevDate = getPrevDate(d);
     const nextDate = getNextDate(d);
     
@@ -61,7 +61,7 @@ function App() {
     setPrevTasks(prevData);
     setCurrentTasks(currentData);
     setNextTasks(nextData);
-  };
+  }, [date]);
 
   const fetchDetails = async (id: number) => {
     const res = await fetch(`/api/tasks/${id}`);
@@ -131,7 +131,7 @@ function App() {
 
   const copyToNextDay = async (task: Task) => {
     try {
-      const nextDate = getNextDate(date);
+      const nextDate = getNextDate(task.date);
       console.log(`Copying task ${task.id} to ${nextDate}`);
       const response = await fetch(`/api/tasks/${task.id}/copy`, {
         method: 'POST',

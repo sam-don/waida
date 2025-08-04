@@ -119,6 +119,15 @@ app.post('/api/tasks/:id/copy', async (req, res) => {
       return res.status(404).json({ error: 'not found' });
     }
     
+    const existingCopy = await db.get(
+      'SELECT id FROM tasks WHERE task_group_id = ? AND date = ?', 
+      task.task_group_id, target_date
+    );
+    if (existingCopy) {
+      console.log(`Task already copied to ${target_date}`);
+      return res.status(409).json({ error: 'Task has already been copied to this date' });
+    }
+    
     console.log(`Copying task "${task.text}" to date: ${target_date}`);
     const result: any = await db.run('INSERT INTO tasks(text, notes, date, task_group_id) VALUES(?, ?, ?, ?)', 
       task.text, task.notes, target_date, task.task_group_id);
