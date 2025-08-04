@@ -7,7 +7,8 @@ const app = express();
 app.use(express.json());
 
 let db: Database;
-(async () => {
+
+const initializeDatabase = async () => {
   try {
     console.log('Initializing database...');
     const database = await open({
@@ -32,11 +33,12 @@ let db: Database;
         FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE CASCADE
       )`);
     console.log('Database initialized successfully');
+    return database;
   } catch (error) {
     console.error('Database initialization failed:', error);
     process.exit(1);
   }
-})();
+};
 
 app.get('/api/tasks', async (req, res) => {
   const date = (req.query.date as string) || new Date().toISOString().substring(0,10);
@@ -137,6 +139,9 @@ app.get('/*path', (_req, res) => {
 });
 
 const port = process.env.PORT || 3001;
-app.listen(port, () => {
-  console.log(`Server listening on port ${port}`);
+
+initializeDatabase().then(() => {
+  app.listen(port, () => {
+    console.log(`Server listening on port ${port}`);
+  });
 });
