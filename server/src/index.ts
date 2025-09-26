@@ -31,6 +31,36 @@ const initializeDatabase = async () => {
         completed INTEGER DEFAULT 0,
         task_group_id TEXT
       )`);
+
+    // Lightweight migration: ensure required columns exist on older databases
+    try {
+      const columns: any[] = await db.all("PRAGMA table_info(tasks)");
+      const colNames = new Set(columns.map((c: any) => c.name));
+
+      if (!colNames.has('completed')) {
+        console.log("Adding missing 'completed' column to tasks table...");
+        await db.exec("ALTER TABLE tasks ADD COLUMN completed INTEGER DEFAULT 0");
+        await db.exec("UPDATE tasks SET completed = 0 WHERE completed IS NULL");
+        console.log("'completed' column added.");
+      }
+
+      if (!colNames.has('task_group_id')) {
+        console.log("Adding missing 'task_group_id' column to tasks table...");
+        await db.exec("ALTER TABLE tasks ADD COLUMN task_group_id TEXT");
+        console.log("'task_group_id' column added.");
+      }
+
+      if (!colNames.has('updated_at')) {
+        console.log("Adding missing 'updated_at' column to tasks table...");
+        // Note: SQLite can't add a column with a non-constant default, so add without default then backfill
+        await db.exec("ALTER TABLE tasks ADD COLUMN updated_at TEXT");
+        await db.exec("UPDATE tasks SET updated_at = CURRENT_TIMESTAMP WHERE updated_at IS NULL");
+        console.log("'updated_at' column added.");
+      }
+    } catch (e) {
+      console.warn('Non-fatal: failed to run migration checks for tasks table:', e);
+    }
+
     await db.exec(`CREATE TABLE IF NOT EXISTS subtasks(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         task_id INTEGER NOT NULL,
@@ -91,16 +121,35 @@ app.get('/api/tasks/:id/subtasks', async (req, res) => {
 });
 
 app.put('/api/tasks/:id/complete', async (req, res) => {
-  const { completed } = req.body;
-  const id = req.params.id;
-  const task = await db.get('SELECT * FROM tasks WHERE id = ?', id);
-  if (!task) return res.status(404).json({ error: 'not found' });
-  
-  await db.run('UPDATE tasks SET completed = ?, updated_at = CURRENT_TIMESTAMP WHERE task_group_id = ?', 
-    completed ? 1 : 0, task.task_group_id);
-  
-  const updatedTasks = await db.all('SELECT * FROM tasks WHERE task_group_id = ?', task.task_group_id);
-  res.json(updatedTasks);
+  try {
+    const { completed } = req.body;
+    const id = req.params.id;
+    const task = await db.get('SELECT * FROM tasks WHERE id = ?', id);
+    if (!task) return res.status(404).json({ error: 'not found' });
+
+  const completedInt = completed ? 1 : 0;
+
+    if (task.task_group_id) {
+      await db.run(
+        'UPDATE tasks SET completed = ?, updated_at = CURRENT_TIMESTAMP WHERE task_group_id = ?',
+        completedInt,
+        task.task_group_id
+      );
+      const updatedTasks = await db.all('SELECT * FROM tasks WHERE task_group_id = ?', task.task_group_id);
+      return res.json(updatedTasks);
+    } else {
+      await db.run(
+        'UPDATE tasks SET completed = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+        completedInt,
+        id
+      );
+      const updatedTask = await db.get('SELECT * FROM tasks WHERE id = ?', id);
+      return res.json([updatedTask]);
+    }
+  } catch (err) {
+    console.error('Failed to update completed status:', err);
+    return res.status(500).json({ error: 'Failed to update completed status' });
+  }
 });
 
 app.post('/api/tasks/:id/copy', async (req, res) => {
@@ -119,9 +168,17 @@ app.post('/api/tasks/:id/copy', async (req, res) => {
       return res.status(404).json({ error: 'not found' });
     }
     
+    // Ensure the source task has a task_group_id so copies are grouped
+    let groupId = task.task_group_id as string | null;
+    if (!groupId) {
+      groupId = `group_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+      console.log(`Assigning new task_group_id ${groupId} to source task ${id}`);
+      await db.run('UPDATE tasks SET task_group_id = ? WHERE id = ?', groupId, id);
+    }
+
     const existingCopy = await db.get(
-      'SELECT id FROM tasks WHERE task_group_id = ? AND date = ?', 
-      task.task_group_id, target_date
+      'SELECT id FROM tasks WHERE task_group_id = ? AND date = ?',
+      groupId, target_date
     );
     if (existingCopy) {
       console.log(`Task already copied to ${target_date}`);
@@ -129,8 +186,10 @@ app.post('/api/tasks/:id/copy', async (req, res) => {
     }
     
     console.log(`Copying task "${task.text}" to date: ${target_date}`);
-    const result: any = await db.run('INSERT INTO tasks(text, notes, date, task_group_id) VALUES(?, ?, ?, ?)', 
-      task.text, task.notes, target_date, task.task_group_id);
+    const result: any = await db.run(
+      'INSERT INTO tasks(text, notes, date, task_group_id) VALUES(?, ?, ?, ?)',
+      task.text, task.notes, target_date, groupId
+    );
     const newTask = await db.get('SELECT * FROM tasks WHERE id = ?', result.lastID);
     console.log(`Successfully created copy with ID: ${newTask.id}`);
     res.json(newTask);

@@ -58,9 +58,9 @@ function App() {
       prevRes.json(), currentRes.json(), nextRes.json()
     ]);
     
-    setPrevTasks(prevData);
-    setCurrentTasks(currentData);
-    setNextTasks(nextData);
+    setPrevTasks(prevData.map((t: any) => ({ ...t, completed: !!t.completed })));
+    setCurrentTasks(currentData.map((t: any) => ({ ...t, completed: !!t.completed })));
+    setNextTasks(nextData.map((t: any) => ({ ...t, completed: !!t.completed })));
   }, [date]);
 
   const fetchDetails = async (id: number) => {
@@ -163,6 +163,10 @@ function App() {
         <input type="date" value={date} onChange={e => setDate(e.target.value)} />
         <button onClick={nextDay}>Next</button>
       </div>
+      <div className="new-task">
+        <input value={text} onChange={e => setText(e.target.value)} placeholder="New task" />
+        <button onClick={addTask}>Add</button>
+      </div>
       <div className="three-day-container">
         <div className="day-column">
           <div className="day-header">{formatDate(getPrevDate(date))}</div>
@@ -200,10 +204,6 @@ function App() {
         
         <div className="day-column focused">
           <div className="day-header">{formatDate(date)}</div>
-          <div className="new-task">
-            <input value={text} onChange={e => setText(e.target.value)} placeholder="New task" />
-            <button onClick={addTask}>Add</button>
-          </div>
           <ul className="day-tasks">
             {currentTasks.map(t => (
               <li key={t.id} className={t.completed ? 'completed' : ''}>
