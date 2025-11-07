@@ -4,11 +4,11 @@ WORKDIR /app
 
 # Install server dependencies
 COPY server/package*.json ./server/
-RUN cd server && npm ci
+RUN cd server && npm install
 
 # Install client dependencies and build
 COPY client/package*.json ./client/
-RUN cd client && npm ci
+RUN cd client && npm install
 
 # Copy source
 COPY server ./server
@@ -31,7 +31,7 @@ COPY --from=build /app/client/dist ./client/dist
 
 
 # Install only production deps for server
-RUN cd server && npm ci --omit=dev
+RUN cd server && npm install --omit=dev
 
 EXPOSE 3001
 CMD ["node", "server/dist/index.js"]
