@@ -1,5 +1,5 @@
 # Build stage
-FROM node:20 AS build
+FROM node:24 AS build
 WORKDIR /app
 
 # Install server dependencies
@@ -19,7 +19,7 @@ RUN cd client && npm run build
 RUN cd server && npm run build
 
 # Runtime stage
-FROM node:20-slim
+FROM node:24-slim
 ENV NODE_ENV=production
 WORKDIR /app
 
