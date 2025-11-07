@@ -4,8 +4,9 @@
   "description": "What Am I Doing Again? - Task tracking application",
   "private": true,
   "scripts": {
-    "start": "concurrently \"npm run client\" \"npm run server\"",
+    "start": "concurrently \"npm run server\" \"npm run client:wait\"",
     "client": "cd client && npm run dev",
+    "client:wait": "node scripts/wait-for-server.js && npm run client",
     "server": "cd server && npm run build && npm run start"
   },
   "devDependencies": {

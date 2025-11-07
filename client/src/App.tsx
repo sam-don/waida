@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import './App.css';
 
 interface Task {
@@ -12,9 +12,29 @@ interface Task {
   task_group_id?: string;
 }
 
+interface RawTask extends Omit<Task, 'completed'> {
+  completed: boolean | number;
+}
+
 interface TaskDetail extends Task {
   subtasks: { id: number; text: string }[];
 }
+
+interface TaskColumnProps {
+  title: string;
+  tasks: Task[];
+  isFocused?: boolean;
+  selectedTaskId: number | null;
+  details: TaskDetail | null;
+  onToggleComplete(task: Task): void | Promise<void>;
+  onSelect(taskId: number): void;
+  onEdit(task: Task): void | Promise<void>;
+  onDelete(taskId: number): void | Promise<void>;
+  onCopy(task: Task): void | Promise<void>;
+}
+
+const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
+const apiUrl = (path: string) => `${API_BASE}${path}`;
 
 function formatDate(dateString: string) {
   const date = new Date(dateString);
@@ -22,8 +42,68 @@ function formatDate(dateString: string) {
   return new Intl.DateTimeFormat('en-US', options).format(date);
 }
 
+function normalizeTask(raw: RawTask): Task {
+  return { ...raw, completed: Boolean(raw.completed) };
+}
+
+function TaskColumn({
+  title,
+  tasks,
+  isFocused,
+  selectedTaskId,
+  details,
+  onToggleComplete,
+  onSelect,
+  onEdit,
+  onDelete,
+  onCopy
+}: TaskColumnProps) {
+  return (
+    <div className={`day-column${isFocused ? ' focused' : ''}`}>
+      <div className="day-header">{title}</div>
+      <ul className="day-tasks">
+        {tasks.map(task => {
+          const showDetails = selectedTaskId === task.id && details?.id === task.id;
+          return (
+            <li key={task.id} className={task.completed ? 'completed' : ''}>
+              <div className="task-content">
+                <input
+                  type="checkbox"
+                  checked={task.completed}
+                  onChange={() => onToggleComplete(task)}
+                  className="task-checkbox"
+                />
+                <span onClick={() => onSelect(task.id)} className="task-text">
+                  {task.text}
+                </span>
+              </div>
+              <div className="task-actions">
+                <button onClick={() => onEdit(task)}>Edit</button>
+                <button onClick={() => onDelete(task.id)}>Delete</button>
+                <button onClick={() => onCopy(task)}>Copy →</button>
+              </div>
+              {showDetails && details && (
+                <div className="details">
+                  {details.notes.trim() !== '' && <p>{details.notes}</p>}
+                  {details.subtasks.length > 0 && (
+                    <ul>
+                      {details.subtasks.map(subtask => (
+                        <li key={subtask.id}>{subtask.text}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
 function App() {
-  const today = new Date().toISOString().substring(0,10);
+  const today = new Date().toISOString().substring(0, 10);
   const [prevTasks, setPrevTasks] = useState<Task[]>([]);
   const [currentTasks, setCurrentTasks] = useState<Task[]>([]);
   const [nextTasks, setNextTasks] = useState<Task[]>([]);
@@ -33,127 +113,199 @@ function App() {
   const [details, setDetails] = useState<TaskDetail | null>(null);
 
   const getPrevDate = (d: string) => {
-    const date = new Date(d);
-    date.setDate(date.getDate() - 1);
-    return date.toISOString().substring(0, 10);
+    const dateObj = new Date(d);
+    dateObj.setDate(dateObj.getDate() - 1);
+    return dateObj.toISOString().substring(0, 10);
   };
 
   const getNextDate = (d: string) => {
-    const date = new Date(d);
-    date.setDate(date.getDate() + 1);
-    return date.toISOString().substring(0, 10);
+    const dateObj = new Date(d);
+    dateObj.setDate(dateObj.getDate() + 1);
+    return dateObj.toISOString().substring(0, 10);
   };
 
-  const fetchAllTasks = useCallback(async (d = date) => {
-    const prevDate = getPrevDate(d);
-    const nextDate = getNextDate(d);
-    
-    const [prevRes, currentRes, nextRes] = await Promise.all([
-      fetch(`/api/tasks?date=${prevDate}`),
-      fetch(`/api/tasks?date=${d}`),
-      fetch(`/api/tasks?date=${nextDate}`)
-    ]);
-    
-    const [prevData, currentData, nextData] = await Promise.all([
-      prevRes.json(), currentRes.json(), nextRes.json()
-    ]);
-    
-    setPrevTasks(prevData.map((t: any) => ({ ...t, completed: !!t.completed })));
-    setCurrentTasks(currentData.map((t: any) => ({ ...t, completed: !!t.completed })));
-    setNextTasks(nextData.map((t: any) => ({ ...t, completed: !!t.completed })));
-  }, [date]);
+  const fetchTasksForDate = useCallback(async (targetDate: string) => {
+    const response = await fetch(apiUrl(`/api/tasks?date=${targetDate}`));
+    if (!response.ok) {
+      throw new Error(`Failed to fetch tasks for ${targetDate}`);
+    }
+    const data: RawTask[] = await response.json();
+    return data.map(normalizeTask);
+  }, []);
 
-  const fetchDetails = async (id: number) => {
-    const res = await fetch(`/api/tasks/${id}`);
-    const data = await res.json();
-    setDetails(data);
-  };
+  const fetchAllTasks = useCallback(
+    async (targetDate = date) => {
+      try {
+        const [prev, current, next] = await Promise.all([
+          fetchTasksForDate(getPrevDate(targetDate)),
+          fetchTasksForDate(targetDate),
+          fetchTasksForDate(getNextDate(targetDate))
+        ]);
+        setPrevTasks(prev);
+        setCurrentTasks(current);
+        setNextTasks(next);
+      } catch (error) {
+        console.error('Failed to load tasks:', error);
+      }
+    },
+    [date, fetchTasksForDate]
+  );
 
-  useEffect(() => { fetchAllTasks(); }, [date, fetchAllTasks]);
+  const fetchDetails = useCallback(async (id: number) => {
+    try {
+      const response = await fetch(apiUrl(`/api/tasks/${id}`));
+      if (!response.ok) {
+        throw new Error(`Failed to fetch details for task ${id}`);
+      }
+      const data: (RawTask & { subtasks: { id: number; text: string }[] }) = await response.json();
+      const { subtasks, ...rest } = data;
+      setDetails({ ...normalizeTask(rest), subtasks });
+    } catch (error) {
+      console.error(error);
+      setDetails(null);
+      alert('Failed to load task details. Please try again.');
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAllTasks();
+  }, [fetchAllTasks]);
 
   const addTask = async () => {
-    if (!text) return;
-    await fetch('/api/tasks', {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    const response = await fetch(apiUrl('/api/tasks'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, date })
+      body: JSON.stringify({ text: trimmed, date })
     });
+    if (!response.ok) {
+      alert('Failed to add task. Please try again.');
+      return;
+    }
     setText('');
     fetchAllTasks();
   };
 
   const deleteTask = async (id: number) => {
-    await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
-    if (selected === id) setSelected(null);
+    const response = await fetch(apiUrl(`/api/tasks/${id}`), { method: 'DELETE' });
+    if (!response.ok) {
+      alert('Failed to delete task. Please try again.');
+      return;
+    }
+    if (selected === id) {
+      setSelected(null);
+      setDetails(null);
+    }
     fetchAllTasks();
   };
 
   const editTask = async (task: Task) => {
-    const newText = prompt('Edit task', task.text);
+    const newText = prompt('Edit task', task.text)?.trim();
     if (!newText) return;
-    await fetch(`/api/tasks/${task.id}`, {
+    const response = await fetch(apiUrl(`/api/tasks/${task.id}`), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text: newText })
     });
+    if (!response.ok) {
+      alert('Failed to update task. Please try again.');
+      return;
+    }
+    if (selected === task.id) {
+      fetchDetails(task.id);
+    }
     fetchAllTasks();
   };
 
   const prevDay = () => {
-    const d = new Date(date);
-    d.setDate(d.getDate() - 1);
-    setDate(d.toISOString().substring(0,10));
+    const prev = getPrevDate(date);
+    setDate(prev);
   };
+
   const nextDay = () => {
-    const d = new Date(date);
-    d.setDate(d.getDate() + 1);
-    setDate(d.toISOString().substring(0,10));
+    const next = getNextDate(date);
+    setDate(next);
   };
 
   const selectTask = (id: number) => {
     if (selected === id) {
       setSelected(null);
       setDetails(null);
-    } else {
-      setSelected(id);
-      fetchDetails(id);
+      return;
     }
+    setSelected(id);
+    setDetails(null);
+    fetchDetails(id);
   };
 
   const toggleComplete = async (task: Task) => {
-    await fetch(`/api/tasks/${task.id}/complete`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ completed: !task.completed })
-    });
-    fetchAllTasks();
+    try {
+      const response = await fetch(apiUrl(`/api/tasks/${task.id}/complete`), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ completed: !task.completed })
+      });
+      if (!response.ok) {
+        const errorBody = await response.json().catch(() => ({}));
+        const message = typeof errorBody.error === 'string' ? errorBody.error : 'Failed to update task status.';
+        alert(message);
+        return;
+      }
+      fetchAllTasks();
+      if (selected === task.id) {
+        fetchDetails(task.id);
+      }
+    } catch (error) {
+      console.error('Failed to toggle task completion:', error);
+      alert('Failed to update task status. Please try again.');
+    }
   };
 
   const copyToNextDay = async (task: Task) => {
     try {
       const nextDate = getNextDate(task.date);
-      console.log(`Copying task ${task.id} to ${nextDate}`);
-      const response = await fetch(`/api/tasks/${task.id}/copy`, {
+      const response = await fetch(apiUrl(`/api/tasks/${task.id}/copy`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ target_date: nextDate })
       });
-      
+
       if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Copy failed:', response.status, errorData);
-        alert(`Failed to copy task: ${errorData.error || 'Unknown error'}`);
+        const errorData = await response.json().catch(() => ({}));
+        const message = typeof errorData.error === 'string' ? errorData.error : 'Unknown error';
+        alert(`Failed to copy task: ${message}`);
         return;
       }
-      
-      const newTask = await response.json();
-      console.log('Task copied successfully:', newTask);
+
+      await response.json();
       fetchAllTasks();
     } catch (error) {
       console.error('Error copying task:', error);
       alert('Failed to copy task. Please try again.');
     }
   };
+
+  const columns = [
+    {
+      key: 'prev',
+      title: formatDate(getPrevDate(date)),
+      tasks: prevTasks,
+      isFocused: false
+    },
+    {
+      key: 'current',
+      title: formatDate(date),
+      tasks: currentTasks,
+      isFocused: true
+    },
+    {
+      key: 'next',
+      title: formatDate(getNextDate(date)),
+      tasks: nextTasks,
+      isFocused: false
+    }
+  ];
 
   return (
     <div className="App">
@@ -168,107 +320,21 @@ function App() {
         <button onClick={addTask}>Add</button>
       </div>
       <div className="three-day-container">
-        <div className="day-column">
-          <div className="day-header">{formatDate(getPrevDate(date))}</div>
-          <ul className="day-tasks">
-            {prevTasks.map(t => (
-              <li key={t.id} className={t.completed ? 'completed' : ''}>
-                <div className="task-content">
-                  <input 
-                    type="checkbox" 
-                    checked={t.completed} 
-                    onChange={() => toggleComplete(t)}
-                    className="task-checkbox"
-                  />
-                  <span onClick={() => selectTask(t.id)} className="task-text">{t.text}</span>
-                </div>
-                <div className="task-actions">
-                  <button onClick={() => editTask(t)}>Edit</button>
-                  <button onClick={() => deleteTask(t.id)}>Delete</button>
-                  <button onClick={() => copyToNextDay(t)}>Copy →</button>
-                </div>
-                {selected === t.id && details && (
-                  <div className="details">
-                    <p>{details.notes}</p>
-                    {details.subtasks.length > 0 && (
-                      <ul>
-                        {details.subtasks.map(s => <li key={s.id}>{s.text}</li>)}
-                      </ul>
-                    )}
-                  </div>
-                )}
-              </li>
-            ))}
-          </ul>
-        </div>
-        
-        <div className="day-column focused">
-          <div className="day-header">{formatDate(date)}</div>
-          <ul className="day-tasks">
-            {currentTasks.map(t => (
-              <li key={t.id} className={t.completed ? 'completed' : ''}>
-                <div className="task-content">
-                  <input 
-                    type="checkbox" 
-                    checked={t.completed} 
-                    onChange={() => toggleComplete(t)}
-                    className="task-checkbox"
-                  />
-                  <span onClick={() => selectTask(t.id)} className="task-text">{t.text}</span>
-                </div>
-                <div className="task-actions">
-                  <button onClick={() => editTask(t)}>Edit</button>
-                  <button onClick={() => deleteTask(t.id)}>Delete</button>
-                  <button onClick={() => copyToNextDay(t)}>Copy →</button>
-                </div>
-                {selected === t.id && details && (
-                  <div className="details">
-                    <p>{details.notes}</p>
-                    {details.subtasks.length > 0 && (
-                      <ul>
-                        {details.subtasks.map(s => <li key={s.id}>{s.text}</li>)}
-                      </ul>
-                    )}
-                  </div>
-                )}
-              </li>
-            ))}
-          </ul>
-        </div>
-        
-        <div className="day-column">
-          <div className="day-header">{formatDate(getNextDate(date))}</div>
-          <ul className="day-tasks">
-            {nextTasks.map(t => (
-              <li key={t.id} className={t.completed ? 'completed' : ''}>
-                <div className="task-content">
-                  <input 
-                    type="checkbox" 
-                    checked={t.completed} 
-                    onChange={() => toggleComplete(t)}
-                    className="task-checkbox"
-                  />
-                  <span onClick={() => selectTask(t.id)} className="task-text">{t.text}</span>
-                </div>
-                <div className="task-actions">
-                  <button onClick={() => editTask(t)}>Edit</button>
-                  <button onClick={() => deleteTask(t.id)}>Delete</button>
-                  <button onClick={() => copyToNextDay(t)}>Copy →</button>
-                </div>
-                {selected === t.id && details && (
-                  <div className="details">
-                    <p>{details.notes}</p>
-                    {details.subtasks.length > 0 && (
-                      <ul>
-                        {details.subtasks.map(s => <li key={s.id}>{s.text}</li>)}
-                      </ul>
-                    )}
-                  </div>
-                )}
-              </li>
-            ))}
-          </ul>
-        </div>
+        {columns.map(column => (
+          <TaskColumn
+            key={column.key}
+            title={column.title}
+            tasks={column.tasks}
+            isFocused={column.isFocused}
+            selectedTaskId={selected}
+            details={details}
+            onToggleComplete={toggleComplete}
+            onSelect={selectTask}
+            onEdit={editTask}
+            onDelete={deleteTask}
+            onCopy={copyToNextDay}
+          />
+        ))}
       </div>
     </div>
   );

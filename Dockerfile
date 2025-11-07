@@ -4,36 +4,34 @@ WORKDIR /app
 
 # Install server dependencies
 COPY server/package*.json ./server/
-WORKDIR /app/server
-RUN npm install
+RUN cd server && npm ci
 
 # Install client dependencies and build
-WORKDIR /app
 COPY client/package*.json ./client/
-WORKDIR /app/client
-RUN npm install
+RUN cd client && npm ci
 
 # Copy source
-WORKDIR /app
 COPY server ./server
 COPY client ./client
 
 # Build client and server
-WORKDIR /app/client
-RUN npm run build
-WORKDIR /app/server
-RUN npm run build
+RUN cd client && npm run build
+RUN cd server && npm run build
 
 # Runtime stage
-FROM node:20
+FROM node:20-slim
+ENV NODE_ENV=production
 WORKDIR /app
+
+# Copy server and client dist
 COPY --from=build /app/server/dist ./server/dist
 COPY --from=build /app/server/package.json ./server/package.json
+COPY --from=build /app/server/package-lock.json ./server/package-lock.json
 COPY --from=build /app/client/dist ./client/dist
 
-WORKDIR /app/server
-RUN npm install --omit=dev
-EXPOSE 3001
 
-WORKDIR /app
+# Install only production deps for server
+RUN cd server && npm ci --omit=dev
+
+EXPOSE 3001
 CMD ["node", "server/dist/index.js"]

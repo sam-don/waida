@@ -7,6 +7,26 @@ const app = express();
 app.use(express.json());
 
 app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin) {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Vary', 'Origin');
+  } else {
+    res.header('Access-Control-Allow-Origin', '*');
+  }
+  res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+  res.header(
+    'Access-Control-Allow-Headers',
+    req.header('Access-Control-Request-Headers') || 'Content-Type, Authorization'
+  );
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(204);
+  }
+  next();
+});
+
+app.use((req, res, next) => {
   console.log(`${req.method} ${req.path} - ${new Date().toISOString()}`);
   next();
 });
@@ -16,8 +36,9 @@ let db: Database;
 const initializeDatabase = async () => {
   try {
     console.log('Initializing database...');
+    const dbFile = process.env.DB_PATH || path.join(process.cwd(), 'database.db');
     const database = await open({
-      filename: './database.db',
+      filename: dbFile,
       driver: sqlite3.Database
     });
     db = database;
@@ -71,7 +92,7 @@ const initializeDatabase = async () => {
     return database;
   } catch (error) {
     console.error('Database initialization failed:', error);
-    process.exit(1);
+    throw error;
   }
 };
 
@@ -92,7 +113,7 @@ app.get('/api/tasks/:id', async (req, res) => {
 app.post('/api/tasks', async (req, res) => {
   const { text, notes = '', date, task_group_id } = req.body;
   if (!text || !date) return res.status(400).json({ error: 'text and date required' });
-  const groupId = task_group_id || `group_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  const groupId = task_group_id || `group_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
   const result: any = await db.run('INSERT INTO tasks(text, notes, date, task_group_id) VALUES(?, ?, ?, ?)', text, notes, date, groupId);
   const task = await db.get('SELECT * FROM tasks WHERE id = ?', result.lastID);
   res.json(task);
@@ -103,8 +124,15 @@ app.put('/api/tasks/:id', async (req, res) => {
   const id = req.params.id;
   const task = await db.get('SELECT * FROM tasks WHERE id = ?', id);
   if (!task) return res.status(404).json({ error: 'not found' });
-  await db.run('UPDATE tasks SET text = ?, notes = ?, completed = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', 
-    text ?? task.text, notes ?? task.notes, completed ?? task.completed, id);
+  const updatedCompleted =
+    completed === undefined ? task.completed : completed ? 1 : 0;
+  await db.run(
+    'UPDATE tasks SET text = ?, notes = ?, completed = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+    text ?? task.text,
+    notes ?? task.notes,
+    updatedCompleted,
+    id
+  );
   const updatedTask = await db.get('SELECT * FROM tasks WHERE id = ?', id);
   res.json(updatedTask);
 });
@@ -116,7 +144,10 @@ app.delete('/api/tasks/:id', async (req, res) => {
 });
 
 app.get('/api/tasks/:id/subtasks', async (req, res) => {
-  const subtasks = await db.all('SELECT * FROM subtasks WHERE task_id = ?', req.params.id);
+  const id = req.params.id;
+  const task = await db.get('SELECT id FROM tasks WHERE id = ?', id);
+  if (!task) return res.status(404).json({ error: 'not found' });
+  const subtasks = await db.all('SELECT * FROM subtasks WHERE task_id = ?', id);
   res.json(subtasks);
 });
 
@@ -157,21 +188,21 @@ app.post('/api/tasks/:id/copy', async (req, res) => {
     console.log(`Copy request received for task ID: ${req.params.id}`);
     const { target_date } = req.body;
     const id = req.params.id;
-    
+
     if (!target_date) {
       return res.status(400).json({ error: 'target_date is required' });
     }
-    
+
     const task = await db.get('SELECT * FROM tasks WHERE id = ?', id);
     if (!task) {
       console.log(`Task not found for ID: ${id}`);
       return res.status(404).json({ error: 'not found' });
     }
-    
+
     // Ensure the source task has a task_group_id so copies are grouped
     let groupId = task.task_group_id as string | null;
     if (!groupId) {
-      groupId = `group_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+      groupId = `group_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
       console.log(`Assigning new task_group_id ${groupId} to source task ${id}`);
       await db.run('UPDATE tasks SET task_group_id = ? WHERE id = ?', groupId, id);
     }
@@ -184,7 +215,7 @@ app.post('/api/tasks/:id/copy', async (req, res) => {
       console.log(`Task already copied to ${target_date}`);
       return res.status(409).json({ error: 'Task has already been copied to this date' });
     }
-    
+
     console.log(`Copying task "${task.text}" to date: ${target_date}`);
     const result: any = await db.run(
       'INSERT INTO tasks(text, notes, date, task_group_id) VALUES(?, ?, ?, ?)',
@@ -202,12 +233,11 @@ app.post('/api/tasks/:id/copy', async (req, res) => {
 app.post('/api/tasks/:id/subtasks', async (req, res) => {
   const { text } = req.body;
   if (!text) return res.status(400).json({ error: 'text required' });
-  const result: any = await db.run('INSERT INTO subtasks(task_id, text) VALUES(?, ?)', req.params.id, text);
-  res.json({ id: result.lastID, task_id: req.params.id, text });
-});
-
-app.use('/api', (req, res, next) => {
-  next();
+  const id = req.params.id;
+  const task = await db.get('SELECT id FROM tasks WHERE id = ?', id);
+  if (!task) return res.status(404).json({ error: 'not found' });
+  const result: any = await db.run('INSERT INTO subtasks(task_id, text) VALUES(?, ?)', id, text);
+  res.json({ id: result.lastID, task_id: id, text });
 });
 
 app.use(express.static(path.join(__dirname, '../../client/dist')));
@@ -218,8 +248,14 @@ app.get(/^(?!\/api).*/, (_req, res) => {
 
 const port = process.env.PORT || 3001;
 
-initializeDatabase().then(() => {
-  app.listen(port, () => {
-    console.log(`Server listening on port ${port}`);
+initializeDatabase()
+  .then(() => {
+    app.listen(port, () => {
+      console.log(`Server listening on port ${port}`);
+    });
+  })
+  .catch(error => {
+    console.error('Server startup aborted due to initialization failure:', error);
+    process.exit(1);
   });
-});
+
