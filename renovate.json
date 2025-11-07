@@ -1,0 +1,77 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", ":semanticCommits"],
+  "onboarding": false,
+  "dependencyDashboard": true,
+  "labels": ["dependencies"],
+  "prConcurrentLimit": 5,
+  "prHourlyLimit": 4,
+  "platformAutomerge": true,
+  "schedule": ["every week on Monday"],
+  "lockFileMaintenance": {
+    "enabled": true,
+    "automerge": true,
+    "schedule": ["every week on Monday"]
+  },
+  "packageRules": [
+    {
+      "matchManagers": ["npm"],
+      "matchPaths": ["client/**"],
+      "groupName": "React (client)",
+      "matchPackagePatterns": ["^react$", "^react-dom$", "^@types/react$", "^@types/react-dom$"],
+      "matchUpdateTypes": ["minor", "patch", "digest"]
+    },
+    {
+      "matchManagers": ["npm"],
+      "groupName": "Vite toolchain",
+      "matchPackagePatterns": ["^vite", "^@vitejs/"] ,
+      "matchUpdateTypes": ["minor", "patch", "digest"]
+    },
+    {
+      "matchManagers": ["npm"],
+      "groupName": "ESLint & linting",
+      "matchPackagePatterns": ["^eslint", "^@eslint/", "^eslint-plugin", "^typescript-eslint", "^globals$"] ,
+      "matchUpdateTypes": ["minor", "patch", "digest"]
+    },
+    {
+      "matchManagers": ["npm"],
+      "groupName": "TypeScript stack",
+      "matchPackagePatterns": ["^typescript$", "^ts-node$", "^@types/"] ,
+      "matchUpdateTypes": ["minor", "patch", "digest"]
+    },
+    {
+      "matchManagers": ["npm"],
+      "matchPaths": ["server/**"],
+      "groupName": "Express stack (server)",
+      "matchPackagePatterns": ["^express$", "^@types/express$"] ,
+      "matchUpdateTypes": ["minor", "patch", "digest"]
+    },
+    {
+      "matchManagers": ["npm"],
+      "matchPaths": ["server/**"],
+      "groupName": "SQLite stack (server)",
+      "matchPackagePatterns": ["^sqlite$", "^sqlite3$"] ,
+      "matchUpdateTypes": ["minor", "patch", "digest"]
+    },
+    {
+      "matchManagers": ["npm"],
+      "separateMultipleMajor": true,
+      "stabilityDays": 3
+    },
+    {
+      "description": "Automerge patch for all npm deps",
+      "matchManagers": ["npm"],
+      "matchUpdateTypes": ["patch", "digest"],
+      "automerge": true,
+      "automergeType": "pr"
+    },
+    {
+      "description": "Automerge minor & patch for devDependencies",
+      "matchManagers": ["npm"],
+      "matchDepTypes": ["devDependencies"],
+      "matchUpdateTypes": ["minor", "patch", "digest"],
+      "automerge": true,
+      "automergeType": "pr"
+    }
+  ]
+}
