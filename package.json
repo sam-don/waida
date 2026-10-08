@@ -10,7 +10,7 @@
     "server": "cd server && npm run build && npm run start"
   },
   "devDependencies": {
-    "concurrently": "^9.0.0"
+    "concurrently": "^10.0.0"
   },
   "workspaces": [
     "client",
